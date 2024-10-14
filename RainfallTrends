@@ -1,0 +1,43 @@
+// Import CHIRPS Dataset
+var chirps = ee.ImageCollection('UCSB-CHG/CHIRPS/DAILY');
+
+// Define region of interest (Sudan) and get the data from the FAO database
+var sudan = ee.FeatureCollection('FAO/GAUL/2015/level1')
+  .filter(ee.Filter.eq('ADM0_NAME', 'Sudan'));
+
+// Define date range (2002 to 2023, July to October)
+var startDate = ee.Date('2002-07-01');
+var endDate = ee.Date('2023-10-31');
+
+// Filter CHIRPS data for the time range and region
+var chirpsFiltered = chirps.filterDate(startDate, endDate)
+  .filterBounds(sudan);
+
+// Group by month to calculate monthly averages
+var monthlyRainfall = chirpsFiltered.map(function(image) {
+  var month = ee.Date(image.get('system:time_start')).get('month');
+  return image.reduceRegions({
+    collection: sudan,
+    reducer: ee.Reducer.mean(),
+    scale: 5000
+  }).set('month', month);
+});
+
+// Generate a time series chart for the average rainfall
+var chart = ui.Chart.image.seriesByRegion({
+  imageCollection: chirpsFiltered,
+  regions: sudan,
+  reducer: ee.Reducer.mean(),
+  band: 'precipitation',
+  scale: 5000,
+  xProperty: 'system:time_start',
+  seriesProperty: 'ADM1_NAME'
+}).setOptions({
+  title: 'Average Monthly Rainfall in Sudan (July - October, 2002-2023)',
+  vAxis: {title: 'Rainfall (mm)'},
+  hAxis: {title: 'Date'},
+  lineWidth: 1
+});
+
+// Display the chart
+print(chart);
